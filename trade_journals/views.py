@@ -6,7 +6,7 @@ import pandas as pd
 
 
 
-@api_view(['GET'])
+@api_view(['POST'])
 def win_percentage(request):
     print(request.FILES.get('report'))
   
@@ -76,3 +76,50 @@ def profitable_day(request):
         }, status=status.HTTP_200_OK)
     except Exception as e:
         return JsonResponse({'message': 'Error processing the file'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def analyze_win_percentage(request):
+    if 'report' in request.FILES:
+        uploaded_file = request.FILES['report']
+
+        try:
+            df = pd.read_csv(uploaded_file)
+
+            # Calculate win percentage
+            total_trades = len(df)
+            winning_trades = len(df[df['profit_inr'] > 0])
+            win_percentage = (winning_trades / total_trades) * 100
+
+            # Calculate most profitable pair
+            profit_by_pair = df.groupby('symbol')['profit_inr'].sum()
+            most_profitable_pair = profit_by_pair.idxmax()
+            highest_profit_pair = profit_by_pair.max()
+
+            # Calculate most profitable day
+            df['opening_time_utc'] = pd.to_datetime(df['opening_time_utc'])
+            df['profit_inr'] = pd.to_numeric(df['profit_inr'], errors='coerce')
+            df['day_of_week'] = df['opening_time_utc'].dt.day_name()
+
+            profit_by_day = df.groupby('day_of_week')['profit_inr'].sum()
+            most_profitable_day = profit_by_day.idxmax()
+
+            # Calculate Risk to Reward ratio
+            # average_profit_per_trade = df['profit_inr'].mean()
+            # average_loss_per_trade = df[df['profit_inr'] < 0]['profit_inr'].mean()
+            # risk_to_reward = abs(average_loss_per_trade / average_profit_per_trade)
+            data = {
+                'total_trades': total_trades,
+                'winning_trades': winning_trades,
+                'win_percentage': win_percentage,
+                'most_profitable_pair': most_profitable_pair,
+                'most_profitable_day': most_profitable_day,
+            }
+            return JsonResponse({
+                "message": 'File uploaded successfully',
+                "data":data,
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return JsonResponse({'message': 'Error processing the file'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return JsonResponse({'message': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
