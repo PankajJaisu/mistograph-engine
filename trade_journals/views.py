@@ -113,8 +113,19 @@ def analyze_win_percentage(request):
             highest_profit_pair = profit_by_pair.max()
             df['opening_time_utc'] = pd.to_datetime(df['opening_time_utc'])
             df[profit_column] = pd.to_numeric(df[profit_column], errors='coerce')
+           
+          
+
             df['day_of_week'] = df['opening_time_utc'].dt.day_name()
-            profit_by_day = df.groupby('day_of_week')[profit_column].sum()
+            
+            # Calculate the average profit per day
+            profit_by_day = df.groupby('day_of_week')[profit_column].mean()
+            print(profit_by_day)
+            profit_by_day_dict= profit_by_day.to_dict()
+
+
+
+
             most_profitable_day = profit_by_day.idxmax()
 
             # Risk to Reward calculation
@@ -166,8 +177,12 @@ def analyze_win_percentage(request):
                 'most_profitable_session': most_profitable_session,
                 'london_session_profit': session_profit_dict.get('London Session', 0),
                 'new_york_session_profit': session_profit_dict.get('New York Session', 0),
-
-            
+                'monday_mean_profit':profit_by_day_dict.get('Monday',0),
+                'tuesday_mean_profit':profit_by_day_dict.get('Tuesday',0),
+                'wednesday_mean_profit':profit_by_day_dict.get('Wednesday',0),
+                'thursday_mean_profit':profit_by_day_dict.get('Thursday',0),
+                'friday_mean_profit':profit_by_day_dict.get('Friday',0),
+    
             }
             return JsonResponse({
                 "message": 'File uploaded successfully',
