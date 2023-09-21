@@ -114,12 +114,33 @@ def analyze_win_percentage(request):
             profit_by_day = df.groupby('day_of_week')['profit_inr'].sum()
             most_profitable_day = profit_by_day.idxmax()
 
+
+            #Risk to Reward calculation
+            df = df.dropna(subset=['stop_loss', 'take_profit'])
+
+            # Calculate risk-to-reward ratio for each trade
+            df['risk'] = abs(df['opening_price'] - df['stop_loss'])
+            df['reward'] = abs(df['take_profit'] - df['opening_price'])
+            df['risk_to_reward'] = df['risk'] / df['reward']
+
+            # Calculate average risk-to-reward ratio
+            average_risk_to_reward = df['risk_to_reward'].mean()
+
+            if average_risk_to_reward >= 1:
+                # If the ratio is greater than or equal to 1, format it as "1:X"
+                formatted_average_risk_to_reward = f"1:{int(average_risk_to_reward)}"
+            else:
+                # If the ratio is less than 1, format it as "X:1"
+                formatted_average_risk_to_reward = f"{int(1/average_risk_to_reward)}:1"
+
+
             data = {
                 'total_trades': total_trades,
                 'winning_trades': winning_trades,
                 'win_percentage': win_percentage,
                 'most_profitable_pair': most_profitable_pair,
                 'most_profitable_day': most_profitable_day,
+                'risk_reward': formatted_average_risk_to_reward,
             }
             return JsonResponse({
                 "message": 'File uploaded successfully',
