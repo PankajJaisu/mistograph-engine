@@ -128,12 +128,33 @@ def analyze_win_percentage(request):
             # Calculate average risk-to-reward ratio
             average_risk_to_reward = df['risk_to_reward'].mean()
 
-            if average_risk_to_reward >= 1:
-                # If the ratio is greater than or equal to 1, format it as "X:1"
-                formatted_average_risk_to_reward = f"{int(average_risk_to_reward)}:1"
-            else:
-                # If the ratio is less than 1, format it as "1:X"
-                formatted_average_risk_to_reward = f"1:{int(1 / average_risk_to_reward)}"
+        
+
+            # Add the session code here:
+            # Define session time ranges
+            london_session_start = '07:00:00'
+            london_session_end = '09:00:00'
+            new_york_session_start = '11:30:00'
+            new_york_session_end = '15:00:00'
+
+            # Create a function to categorize the session
+            def categorize_session(opening_time):
+                if london_session_start <= opening_time <= london_session_end:
+                    return 'London Session'
+                elif new_york_session_start <= opening_time <= new_york_session_end:
+                    return 'New York Session'
+                
+
+            # Apply the categorize_session function to create a new column 'session'
+            df['session'] = df['opening_time_utc'].dt.strftime('%H:%M:%S').apply(categorize_session)
+
+            # Group the data by session and calculate the total profit for each session
+            session_profit = df.groupby('session')[profit_column].sum()
+            session_profit_dict = session_profit.to_dict()
+            print("session_profit: " ,session_profit)
+            # Find the session with the highest profit
+            most_profitable_session = session_profit.idxmax()
+            # highest_profit_session = session_profit.max()
 
             data = {
                 'total_trades': total_trades,
@@ -141,7 +162,12 @@ def analyze_win_percentage(request):
                 'win_percentage': win_percentage,
                 'most_profitable_pair': most_profitable_pair,
                 'most_profitable_day': most_profitable_day,
-                'risk_reward': formatted_average_risk_to_reward,
+                # 'risk_reward': average_risk_to_reward,
+                'most_profitable_session': most_profitable_session,
+                'london_session_profit': session_profit_dict.get('London Session', 0),
+                'new_york_session_profit': session_profit_dict.get('New York Session', 0),
+
+            
             }
             return JsonResponse({
                 "message": 'File uploaded successfully',
