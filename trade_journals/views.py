@@ -101,21 +101,23 @@ def analyze_win_percentage(request):
             else:
                 return JsonResponse({'message': 'Unsupported file format'}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Determine the profit column based on availability
+            profit_column = 'profit_usd' if 'profit_usd' in df.columns else 'profit_inr'
+
             # Calculate win percentage, most profitable pair, most profitable day, etc.
             total_trades = len(df)
-            winning_trades = len(df[df['profit_inr'] > 0])
+            winning_trades = len(df[df[profit_column] > 0])
             win_percentage = (winning_trades / total_trades) * 100
-            profit_by_pair = df.groupby('symbol')['profit_inr'].sum()
+            profit_by_pair = df.groupby('symbol')[profit_column].sum()
             most_profitable_pair = profit_by_pair.idxmax()
             highest_profit_pair = profit_by_pair.max()
             df['opening_time_utc'] = pd.to_datetime(df['opening_time_utc'])
-            df['profit_inr'] = pd.to_numeric(df['profit_inr'], errors='coerce')
+            df[profit_column] = pd.to_numeric(df[profit_column], errors='coerce')
             df['day_of_week'] = df['opening_time_utc'].dt.day_name()
-            profit_by_day = df.groupby('day_of_week')['profit_inr'].sum()
+            profit_by_day = df.groupby('day_of_week')[profit_column].sum()
             most_profitable_day = profit_by_day.idxmax()
 
-
-            #Risk to Reward calculation
+            # Risk to Reward calculation
             df = df.dropna(subset=['stop_loss', 'take_profit'])
 
             # Calculate risk-to-reward ratio for each trade
@@ -127,12 +129,11 @@ def analyze_win_percentage(request):
             average_risk_to_reward = df['risk_to_reward'].mean()
 
             if average_risk_to_reward >= 1:
-                # If the ratio is greater than or equal to 1, format it as "1:X"
-                formatted_average_risk_to_reward = f"1:{int(average_risk_to_reward)}"
+                # If the ratio is greater than or equal to 1, format it as "X:1"
+                formatted_average_risk_to_reward = f"{int(average_risk_to_reward)}:1"
             else:
-                # If the ratio is less than 1, format it as "X:1"
-                formatted_average_risk_to_reward = f"{int(1/average_risk_to_reward)}:1"
-
+                # If the ratio is less than 1, format it as "1:X"
+                formatted_average_risk_to_reward = f"1:{int(1 / average_risk_to_reward)}"
 
             data = {
                 'total_trades': total_trades,
