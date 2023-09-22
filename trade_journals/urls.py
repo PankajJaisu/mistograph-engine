@@ -5,5 +5,6 @@ urlpatterns = [
  path('profitable-pair/',views.profitable_pair),
  path('profitable-day/',views.profitable_day),
  path('analyze-win-percentage/',views.analyze_win_percentage),
+ path('analyze-tft-account/',views.analyze_tft_account),
 
 ]

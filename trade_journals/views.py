@@ -81,7 +81,7 @@ def profitable_day(request):
 
 
 
-
+#for Exness Broker
 @api_view(['POST'])
 def analyze_win_percentage(request):
     if 'report' in request.FILES:
@@ -185,11 +185,118 @@ def analyze_win_percentage(request):
     
             }
             return JsonResponse({
-                "message": 'File uploaded successfully',
+                "message": 'Data Fetched Successfully',
                 "data": data,
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
             print("error", e)
             return JsonResponse({'message': 'Error processing the file'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return JsonResponse({'message': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
+
+#for TFT Broker  
+@api_view(['POST'])
+def analyze_tft_account(request):
+    if 'report' in request.FILES:
+        uploaded_file = request.FILES['report']
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+
+        # try:
+        if file_extension == 'csv':
+            df = pd.read_csv(uploaded_file)
+        elif file_extension == 'xlsx':
+            # Load XLSX file using openpyxl
+            wb = openpyxl.load_workbook(uploaded_file)
+            sheet = wb.active
+            data = sheet.values
+            cols = next(data)
+            df = pd.DataFrame(data, columns=cols)
+        else:
+            return JsonResponse({'message': 'Unsupported file format'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determine the profit column based on availability
+        profit_column = 'Net Profit'
+
+        # Calculate win percentage, most profitable pair, most profitable day, etc.
+        total_trades = len(df)
+        winning_trades = len(df[df[profit_column] > 0])
+        win_percentage = (winning_trades / total_trades) * 100
+        profit_by_pair = df.groupby('Symbol')[profit_column].sum()
+        most_profitable_pair = profit_by_pair.idxmax()
+        highest_profit_pair = profit_by_pair.max()
+        df['Open Time'] = pd.to_datetime(df['Open Time'])
+        df[profit_column] = pd.to_numeric(df[profit_column], errors='coerce')
+
+        df['day_of_week'] = df['Open Time'].dt.day_name()
+
+        # Calculate the average profit per day
+        profit_by_day = df.groupby('day_of_week')[profit_column].mean()
+        profit_by_day_dict = profit_by_day.to_dict()
+
+        most_profitable_day = profit_by_day.idxmax()
+
+        # Risk to Reward calculation
+        df = df.dropna(subset=['Stop Loss', 'Take Profit'])
+
+        # Calculate risk-to-reward ratio for each trade
+        df['risk'] = abs(df['Open Price'] - df['Stop Loss'])
+        df['reward'] = abs(df['Take Profit'] - df['Open Price'])
+        df['risk_to_reward'] = df['risk'] / df['reward']
+
+        # Calculate average risk-to-reward ratio
+        average_risk_to_reward = df['risk_to_reward'].mean()
+
+        # Add the session code here:
+        # Define session time ranges
+        london_session_start = '03:00:00'
+        london_session_end = '05:00:00'
+        new_york_session_start = '07:30:00'
+        new_york_session_end = '10:00:00'
+
+        # Create a function to categorize the session
+        def categorize_session(opening_time):
+            if london_session_start <= opening_time <= london_session_end:
+                return 'London Session'
+            elif new_york_session_start <= opening_time <= new_york_session_end:
+                return 'New York Session'
+
+        # Apply the categorize_session function to create a new column 'session'
+        df['session'] = df['Open Time'].dt.strftime('%H:%M:%S').apply(categorize_session)
+
+        # Group the data by session and calculate the total profit for each session
+        session_profit = df.groupby('session')[profit_column].sum()
+        session_profit_dict = session_profit.to_dict()
+
+        # Find the session with the highest profit
+        most_profitable_session = session_profit.idxmax()
+
+        # Create a dictionary of mean profits by day
+        mean_profit_by_day = (profit_by_day / profit_by_day.sum() * 100).round(2).to_dict()
+
+        data = {
+            'total_trades': total_trades,
+            'winning_trades': winning_trades,
+            'win_percentage': round(win_percentage, 2),
+            'most_profitable_pair': most_profitable_pair,
+            'most_profitable_day': most_profitable_day,
+            'most_profitable_session': most_profitable_session,
+            'london_session_profit': session_profit_dict.get('London Session', 0),
+            'new_york_session_profit': session_profit_dict.get('New York Session', 0),
+            'monday_mean_profit': profit_by_day_dict.get('Monday', 0),
+            'tuesday_mean_profit': profit_by_day_dict.get('Tuesday', 0),
+            'wednesday_mean_profit': profit_by_day_dict.get('Wednesday', 0),
+            'thursday_mean_profit': profit_by_day_dict.get('Thursday', 0),
+            'friday_mean_profit': profit_by_day_dict.get('Friday', 0),
+        }
+        return JsonResponse({
+            "message": 'Data Fetched Successfully',
+            "data": data,
+        }, status=status.HTTP_201_CREATED)
+        # except Exception as e:
+        #     print("error", e)
+        #     return JsonResponse({'message': 'Error processing the file'}, status=status.HTTP_400_BAD_REQUEST)
     else:
         return JsonResponse({'message': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
